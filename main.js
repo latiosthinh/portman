@@ -1,17 +1,41 @@
 require('dotenv').config();
-const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain, screen } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 
 let tray = null;
 let mainWindow = null;
 let serverProcess = null;
+let isWidgetMode = false;
+let widgetCorner = null;
 const PORT = process.env.PORT || 8765;
+
+const WIDGET_SIZE = { width: 380, height: 280 };
+const CORNER_OFFSET = 12;
+
+function getCornerPosition(corner) {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+  const { x: workAreaX, y: workAreaY } = primaryDisplay.workArea;
+
+  switch (corner) {
+    case 'top-left':
+      return { x: workAreaX + CORNER_OFFSET, y: workAreaY + CORNER_OFFSET };
+    case 'top-right':
+      return { x: workAreaX + screenWidth - WIDGET_SIZE.width - CORNER_OFFSET, y: workAreaY + CORNER_OFFSET };
+    case 'bottom-left':
+      return { x: workAreaX + CORNER_OFFSET, y: workAreaY + screenHeight - WIDGET_SIZE.height - CORNER_OFFSET };
+    case 'bottom-right':
+      return { x: workAreaX + screenWidth - WIDGET_SIZE.width - CORNER_OFFSET, y: workAreaY + screenHeight - WIDGET_SIZE.height - CORNER_OFFSET };
+    default:
+      return { x: workAreaX + CORNER_OFFSET, y: workAreaY + screenHeight - WIDGET_SIZE.height - CORNER_OFFSET };
+  }
+}
 
 function createTray() {
   const iconPath = path.join(__dirname, 'assets', 'icon.png');
   let icon = nativeImage.createFromPath(iconPath);
-  
+
   if (icon.isEmpty()) {
     icon = nativeImage.createEmpty();
   }
@@ -23,8 +47,10 @@ function createTray() {
       label: 'Open Dashboard',
       click: () => {
         if (mainWindow) {
+          if (isWidgetMode) {
+            applyWidgetMode(false);
+          }
           mainWindow.show();
-          mainWindow.setAlwaysOnTop(true);
           mainWindow.focus();
         }
       }
@@ -41,6 +67,15 @@ function createTray() {
           `).catch(() => {});
         }
       }
+    },
+    {
+      label: 'Widget Corner',
+      submenu: [
+        { label: 'Top Left', click: () => setWidgetCorner('top-left') },
+        { label: 'Top Right', click: () => setWidgetCorner('top-right') },
+        { label: 'Bottom Left', click: () => setWidgetCorner('bottom-left') },
+        { label: 'Bottom Right', click: () => setWidgetCorner('bottom-right') },
+      ]
     },
     { type: 'separator' },
     {
@@ -70,6 +105,14 @@ function createTray() {
   });
 }
 
+function setWidgetCorner(corner) {
+  widgetCorner = corner;
+  if (isWidgetMode && mainWindow) {
+    const pos = getCornerPosition(corner);
+    mainWindow.setPosition(pos.x, pos.y);
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 900,
@@ -78,6 +121,7 @@ function createWindow() {
     alwaysOnTop: true,
     frame: true,
     transparent: false,
+    backgroundColor: '#0f172a',
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -98,10 +142,17 @@ function createWindow() {
   });
 
   mainWindow.webContents.on('dom-ready', () => {
-    const widgetMode = mainWindow.webContents.executeJavaScript("localStorage.getItem('widgetMode') === 'true'").catch(() => false);
-    widgetMode.then(isWidget => {
+    const savedWidgetMode = mainWindow.webContents.executeJavaScript("localStorage.getItem('widgetMode') === 'true'").catch(() => false);
+    savedWidgetMode.then(isWidget => {
       if (isWidget) {
         applyWidgetMode(true);
+      }
+    });
+
+    const savedCorner = mainWindow.webContents.executeJavaScript("localStorage.getItem('widgetCorner')").catch(() => null);
+    savedCorner.then(corner => {
+      if (corner) {
+        widgetCorner = corner;
       }
     });
   });
@@ -110,19 +161,78 @@ function createWindow() {
 function applyWidgetMode(enabled) {
   if (!mainWindow) return;
 
+  isWidgetMode = enabled;
+
   if (enabled) {
-    mainWindow.setSize(400, 300);
+    mainWindow.setResizable(false);
     mainWindow.setAlwaysOnTop(true, 'screen-saver');
     mainWindow.setSkipTaskbar(true);
+    mainWindow.setSize(WIDGET_SIZE.width, WIDGET_SIZE.height);
+    mainWindow.setMinimumSize(WIDGET_SIZE.width, WIDGET_SIZE.height);
+    mainWindow.setMaximumSize(WIDGET_SIZE.width, WIDGET_SIZE.height);
+
+    const corner = widgetCorner || 'bottom-right';
+    const pos = getCornerPosition(corner);
+    mainWindow.setPosition(pos.x, pos.y);
+
+    mainWindow.webContents.executeJavaScript(`
+      document.body.classList.add('widget-mode');
+      const btn = document.getElementById('widgetToggle');
+      if (btn) btn.classList.add('active');
+    `).catch(() => {});
   } else {
-    mainWindow.setSize(900, 700);
+    mainWindow.setResizable(true);
     mainWindow.setAlwaysOnTop(true);
     mainWindow.setSkipTaskbar(false);
+    mainWindow.setSize(900, 700);
+    mainWindow.setMinimumSize(600, 400);
+    mainWindow.setMaximumSize(0, 0);
+
+    mainWindow.setPosition(
+      Math.floor(screen.getPrimaryDisplay().workAreaSize.width / 2 - 450),
+      Math.floor(screen.getPrimaryDisplay().workAreaSize.height / 2 - 350)
+    );
+
+    mainWindow.webContents.executeJavaScript(`
+      document.body.classList.remove('widget-mode');
+      const btn = document.getElementById('widgetToggle');
+      if (btn) btn.classList.remove('active');
+    `).catch(() => {});
   }
 }
 
 ipcMain.on('set-widget-mode', (event, enabled) => {
   applyWidgetMode(enabled);
+});
+
+ipcMain.on('set-widget-corner', (event, corner) => {
+  setWidgetCorner(corner);
+});
+
+ipcMain.on('widget-dragged', () => {
+  if (isWidgetMode && mainWindow) {
+    const [x, y] = mainWindow.getPosition();
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+    const { x: workAreaX, y: workAreaY } = primaryDisplay.workArea;
+
+    const centerX = x + WIDGET_SIZE.width / 2;
+    const centerY = y + WIDGET_SIZE.height / 2;
+    const screenCenterX = workAreaX + screenWidth / 2;
+    const screenCenterY = workAreaY + screenHeight / 2;
+
+    let newCorner;
+    if (centerX < screenCenterX) {
+      newCorner = centerY < screenCenterY ? 'top-left' : 'bottom-left';
+    } else {
+      newCorner = centerY < screenCenterY ? 'top-right' : 'bottom-right';
+    }
+
+    widgetCorner = newCorner;
+    mainWindow.webContents.executeJavaScript(`
+      localStorage.setItem('widgetCorner', '${newCorner}');
+    `).catch(() => {});
+  }
 });
 
 function startServer() {
@@ -148,7 +258,6 @@ function startServer() {
       const errOutput = data.toString();
       console.error('Server error:', errOutput);
 
-      // Detect port-in-use errors
       if (!portInUseDetected && (
         errOutput.includes('EADDRINUSE') ||
         errOutput.includes('listen EADDRINUSE') ||
@@ -175,7 +284,6 @@ function startServer() {
       reject(err);
     });
 
-    // Server startup timeout (5 seconds)
     setTimeout(() => {
       if (!serverReady && !portInUseDetected) {
         dialog.showErrorBox(
@@ -195,7 +303,7 @@ app.whenReady().then(async () => {
   createTray();
   await startServer();
   createWindow();
-  
+
   mainWindow.show();
 });
 

@@ -17,11 +17,16 @@
       color: #e2e8f0;
       min-height: 100vh;
       padding: 2rem;
-      transition: padding 0.3s;
+      transition: all 0.3s ease;
     }
 
     body.widget-mode {
-      padding: 0.5rem;
+      background: transparent;
+      padding: 0;
+      min-height: auto;
+      overflow: hidden;
+      cursor: move;
+      user-select: none;
     }
 
     .container {
@@ -32,6 +37,13 @@
 
     body.widget-mode .container {
       max-width: 100%;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 12px;
+      border: 1px solid rgba(51, 65, 85, 0.5);
+      padding: 0.75rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
     }
 
     header {
@@ -42,7 +54,13 @@
     }
 
     body.widget-mode header {
-      margin-bottom: 0.75rem;
+      margin-bottom: 0.5rem;
+      padding: 0.25rem 0.5rem;
+      cursor: grab;
+    }
+
+    body.widget-mode header:active {
+      cursor: grabbing;
     }
 
     h1 {
@@ -52,18 +70,20 @@
     }
 
     body.widget-mode h1 {
-      font-size: 0.875rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #94a3b8;
     }
 
     .header-actions {
       display: flex;
-      gap: 0.5rem;
+      gap: 0.375rem;
       align-items: center;
     }
 
-    .refresh-btn, .toggle-btn, .widget-btn {
-      background: #1e293b;
-      border: 1px solid #334155;
+    .refresh-btn, .toggle-btn, .widget-btn, .corner-btn {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(51, 65, 85, 0.8);
       color: #94a3b8;
       padding: 0.5rem 1rem;
       border-radius: 0.5rem;
@@ -72,12 +92,21 @@
       transition: all 0.2s;
     }
 
-    .refresh-btn:hover, .toggle-btn:hover, .widget-btn:hover {
-      background: #334155;
+    body.widget-mode .refresh-btn,
+    body.widget-mode .toggle-btn,
+    body.widget-mode .widget-btn,
+    body.widget-mode .corner-btn {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.625rem;
+      border-radius: 0.25rem;
+    }
+
+    .refresh-btn:hover, .toggle-btn:hover, .widget-btn:hover, .corner-btn:hover {
+      background: rgba(51, 65, 85, 0.8);
       color: #e2e8f0;
     }
 
-    .toggle-btn.active, .widget-btn.active {
+    .toggle-btn.active, .widget-btn.active, .corner-btn.active {
       background: #3b82f6;
       border-color: #3b82f6;
       color: white;
@@ -127,9 +156,10 @@
     }
 
     body.widget-mode .search-box {
-      padding: 0.4rem 0.75rem;
-      font-size: 0.75rem;
-      margin-bottom: 0.5rem;
+      padding: 0.375rem 0.625rem;
+      font-size: 0.625rem;
+      margin-bottom: 0.375rem;
+      border-radius: 0.25rem;
     }
 
     .search-box::placeholder {
@@ -148,6 +178,12 @@
       overflow: hidden;
     }
 
+    body.widget-mode .port-list {
+      background: transparent;
+      border: none;
+      border-radius: 0;
+    }
+
     .port-item {
       display: grid;
       grid-template-columns: 1fr 1.5fr 1fr 1fr auto auto;
@@ -158,8 +194,16 @@
     }
 
     body.widget-mode .port-item {
-      padding: 0.5rem 0.75rem;
-      grid-template-columns: 1fr 1.5fr 1fr auto auto;
+      padding: 0.375rem 0.5rem;
+      grid-template-columns: 1fr 1.25fr 1fr auto auto;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.3);
+      border-radius: 4px;
+      margin-bottom: 2px;
+      background: rgba(30, 41, 59, 0.4);
+    }
+
+    body.widget-mode .port-item:hover {
+      background: rgba(37, 51, 73, 0.7);
     }
 
     body.widget-mode .protocol-col {
@@ -191,8 +235,21 @@
       color: #64748b;
     }
 
+    body.widget-mode .port-header {
+      background: transparent;
+      font-size: 0.5rem;
+      color: #475569;
+      padding: 0.25rem 0.5rem;
+      margin-bottom: 2px;
+      border-radius: 4px;
+    }
+
     .port-header:hover {
       background: #0f172a;
+    }
+
+    body.widget-mode .port-header:hover {
+      background: transparent;
     }
 
     .port-number {
@@ -202,7 +259,7 @@
     }
 
     body.widget-mode .port-number {
-      font-size: 0.75rem;
+      font-size: 0.625rem;
     }
 
     .process-name {
@@ -214,7 +271,7 @@
     }
 
     body.widget-mode .process-name {
-      font-size: 0.75rem;
+      font-size: 0.625rem;
     }
 
     .system-badge {
@@ -226,6 +283,11 @@
       text-transform: uppercase;
     }
 
+    body.widget-mode .system-badge {
+      font-size: 0.4375rem;
+      padding: 0.0625rem 0.25rem;
+    }
+
     .pid {
       font-family: 'SF Mono', 'Fira Code', monospace;
       font-size: 0.75rem;
@@ -233,7 +295,7 @@
     }
 
     body.widget-mode .pid {
-      font-size: 0.625rem;
+      font-size: 0.5rem;
     }
 
     .protocol {
@@ -255,6 +317,12 @@
 
     .kill-btn:hover {
       background: #ef4444;
+    }
+
+    body.widget-mode .kill-btn {
+      padding: 0.1875rem 0.375rem;
+      font-size: 0.5rem;
+      border-radius: 0.1875rem;
     }
 
     .kill-btn:disabled {
@@ -287,11 +355,23 @@
       color: #e2e8f0;
     }
 
+    body.widget-mode .hide-btn {
+      padding: 0.1875rem 0.375rem;
+      font-size: 0.5rem;
+      border-radius: 0.1875rem;
+      margin-right: 0.25rem;
+    }
+
     .hidden-count {
       font-size: 0.75rem;
       color: #64748b;
       padding: 0.5rem 1rem;
       text-align: right;
+    }
+
+    body.widget-mode .hidden-count {
+      font-size: 0.5rem;
+      padding: 0.25rem 0.5rem;
     }
 
     .show-hidden-btn {
@@ -313,10 +393,20 @@
       color: #64748b;
     }
 
+    body.widget-mode .empty-state {
+      padding: 1rem;
+      font-size: 0.625rem;
+    }
+
     .loading {
       text-align: center;
       padding: 2rem;
       color: #64748b;
+    }
+
+    body.widget-mode .loading {
+      padding: 0.75rem;
+      font-size: 0.625rem;
     }
 
     .toast {
@@ -333,6 +423,13 @@
       transition: all 0.3s;
     }
 
+    body.widget-mode .toast {
+      bottom: 0.5rem;
+      right: 0.5rem;
+      padding: 0.375rem 0.75rem;
+      font-size: 0.625rem;
+    }
+
     .toast.show {
       opacity: 1;
       transform: translateY(0);
@@ -341,13 +438,68 @@
     .toast.error {
       background: #dc2626;
     }
+
+    .corner-dropdown {
+      position: relative;
+      display: inline-block;
+    }
+
+    .corner-menu {
+      display: none;
+      position: absolute;
+      top: 100%;
+      right: 0;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(51, 65, 85, 0.8);
+      border-radius: 0.5rem;
+      padding: 0.25rem;
+      z-index: 1000;
+      min-width: 140px;
+      margin-top: 0.25rem;
+    }
+
+    .corner-menu.show {
+      display: block;
+    }
+
+    .corner-menu-item {
+      display: block;
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 0.75rem;
+      text-align: left;
+      cursor: pointer;
+      border-radius: 0.25rem;
+      transition: all 0.15s;
+    }
+
+    .corner-menu-item:hover {
+      background: rgba(51, 65, 85, 0.8);
+      color: #e2e8f0;
+    }
+
+    .corner-menu-item.active {
+      color: #3b82f6;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <header>
+    <header id="widgetHeader">
       <h1>Local Port Dashboard</h1>
       <div class="header-actions">
+        <div class="corner-dropdown">
+          <button class="corner-btn" id="cornerBtn" onclick="toggleCornerMenu()" title="Position widget">⊞</button>
+          <div class="corner-menu" id="cornerMenu">
+            <button class="corner-menu-item" onclick="setCorner('top-left')">↖ Top Left</button>
+            <button class="corner-menu-item" onclick="setCorner('top-right')">↗ Top Right</button>
+            <button class="corner-menu-item" onclick="setCorner('bottom-left')">↙ Bottom Left</button>
+            <button class="corner-menu-item" onclick="setCorner('bottom-right')">↘ Bottom Right</button>
+          </div>
+        </div>
         <button class="widget-btn" id="widgetToggle" onclick="toggleWidgetMode()">Widget</button>
         <button class="toggle-btn" id="systemToggle" onclick="toggleSystemProcesses()">Show System</button>
         <button class="refresh-btn" onclick="loadPorts()">Refresh</button>
@@ -381,6 +533,7 @@
     let widgetMode = localStorage.getItem('widgetMode') === 'true';
     let hiddenPids = JSON.parse(localStorage.getItem('hiddenPids') || '[]');
     let showHidden = false;
+    let widgetCorner = localStorage.getItem('widgetCorner') || 'bottom-right';
 
     if (widgetMode) {
       document.body.classList.add('widget-mode');
@@ -456,7 +609,7 @@
       portList.innerHTML = html;
 
       if (hiddenPorts.length > 0) {
-        hiddenCountEl.innerHTML = `${hiddenPorts.length} hidden process${hiddenPorts.length > 1 ? 'es' : ''} — <button class="show-hidden-btn" onclick="toggleShowHidden()">Show hidden</button>`;
+        hiddenCountEl.innerHTML = `${hiddenPorts.length} hidden — <button class="show-hidden-btn" onclick="toggleShowHidden()">Show</button>`;
       } else {
         hiddenCountEl.innerHTML = '';
       }
@@ -507,6 +660,33 @@
       } catch (e) {}
     }
 
+    function toggleCornerMenu() {
+      const menu = document.getElementById('cornerMenu');
+      menu.classList.toggle('show');
+    }
+
+    function setCorner(corner) {
+      widgetCorner = corner;
+      localStorage.setItem('widgetCorner', corner);
+      document.getElementById('cornerMenu').classList.remove('show');
+
+      try {
+        const { ipcRenderer } = require('electron');
+        ipcRenderer.send('set-widget-corner', corner);
+      } catch (e) {}
+
+      document.querySelectorAll('.corner-menu-item').forEach(item => {
+        item.classList.remove('active');
+      });
+      event.target.classList.add('active');
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.corner-dropdown')) {
+        document.getElementById('cornerMenu').classList.remove('show');
+      }
+    });
+
     async function killPort(pid, isSystem = false) {
       const msg = isSystem
         ? `Force kill system process ${pid}? This may affect system stability.`
@@ -540,6 +720,29 @@
         toast.classList.remove('show');
       }, 3000);
     }
+
+    let dragStart = null;
+    let dragThreshold = 5;
+
+    document.addEventListener('mousedown', (e) => {
+      if (widgetMode && e.target.closest('#widgetHeader')) {
+        dragStart = { x: e.screenX, y: e.screenY };
+      }
+    });
+
+    document.addEventListener('mouseup', (e) => {
+      if (dragStart && widgetMode) {
+        const dx = Math.abs(e.screenX - dragStart.x);
+        const dy = Math.abs(e.screenY - dragStart.y);
+        if (dx > dragThreshold || dy > dragThreshold) {
+          try {
+            const { ipcRenderer } = require('electron');
+            ipcRenderer.send('widget-dragged');
+          } catch (e) {}
+        }
+      }
+      dragStart = null;
+    });
 
     loadPorts();
   </script>
