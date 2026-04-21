@@ -7,10 +7,11 @@ let tray = null;
 let mainWindow = null;
 let serverProcess = null;
 let isWidgetMode = false;
-let widgetCorner = null;
+let widgetCorner = 'bottom-right';
 const PORT = process.env.PORT || 8765;
 
 const WIDGET_SIZE = { width: 380, height: 280 };
+const DASHBOARD_SIZE = { width: 900, height: 700 };
 const CORNER_OFFSET = 12;
 
 function getCornerPosition(corner) {
@@ -26,10 +27,19 @@ function getCornerPosition(corner) {
     case 'bottom-left':
       return { x: workAreaX + CORNER_OFFSET, y: workAreaY + screenHeight - WIDGET_SIZE.height - CORNER_OFFSET };
     case 'bottom-right':
-      return { x: workAreaX + screenWidth - WIDGET_SIZE.width - CORNER_OFFSET, y: workAreaY + screenHeight - WIDGET_SIZE.height - CORNER_OFFSET };
     default:
-      return { x: workAreaX + CORNER_OFFSET, y: workAreaY + screenHeight - WIDGET_SIZE.height - CORNER_OFFSET };
+      return { x: workAreaX + screenWidth - WIDGET_SIZE.width - CORNER_OFFSET, y: workAreaY + screenHeight - WIDGET_SIZE.height - CORNER_OFFSET };
   }
+}
+
+function getCenterPosition() {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+  const { x: workAreaX, y: workAreaY } = primaryDisplay.workArea;
+  return {
+    x: workAreaX + Math.floor(screenWidth / 2 - DASHBOARD_SIZE.width / 2),
+    y: workAreaY + Math.floor(screenHeight / 2 - DASHBOARD_SIZE.height / 2),
+  };
 }
 
 function createTray() {
@@ -48,7 +58,7 @@ function createTray() {
       click: () => {
         if (mainWindow) {
           if (isWidgetMode) {
-            applyWidgetMode(false);
+            recreateWindow(false);
           }
           mainWindow.show();
           mainWindow.focus();
@@ -59,12 +69,7 @@ function createTray() {
       label: 'Toggle Widget Mode',
       click: () => {
         if (mainWindow) {
-          mainWindow.webContents.executeJavaScript(`
-            (function() {
-              const btn = document.getElementById('widgetToggle');
-              if (btn) btn.click();
-            })();
-          `).catch(() => {});
+          recreateWindow(!isWidgetMode);
         }
       }
     },
@@ -113,15 +118,20 @@ function setWidgetCorner(corner) {
   }
 }
 
-function createWindow() {
+function createWindow(asWidget = false) {
+  const isWidget = asWidget || isWidgetMode;
+
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 700,
+    width: isWidget ? WIDGET_SIZE.width : DASHBOARD_SIZE.width,
+    height: isWidget ? WIDGET_SIZE.height : DASHBOARD_SIZE.height,
     show: false,
     alwaysOnTop: true,
-    frame: true,
-    transparent: false,
-    backgroundColor: '#0f172a',
+    frame: !isWidget,
+    transparent: isWidget,
+    hasShadow: !isWidget,
+    backgroundColor: isWidget ? '#00000000' : '#0f172a',
+    resizable: !isWidget,
+    skipTaskbar: isWidget,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -131,6 +141,18 @@ function createWindow() {
   });
 
   mainWindow.loadURL(`http://localhost:${PORT}`);
+
+  if (isWidget) {
+    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    mainWindow.setMinimumSize(WIDGET_SIZE.width, WIDGET_SIZE.height);
+    mainWindow.setMaximumSize(WIDGET_SIZE.width, WIDGET_SIZE.height);
+    const pos = getCornerPosition(widgetCorner);
+    mainWindow.setPosition(pos.x, pos.y);
+  } else {
+    mainWindow.setMinimumSize(600, 400);
+    const pos = getCenterPosition();
+    mainWindow.setPosition(pos.x, pos.y);
+  }
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -142,97 +164,70 @@ function createWindow() {
   });
 
   mainWindow.webContents.on('dom-ready', () => {
-    const savedWidgetMode = mainWindow.webContents.executeJavaScript("localStorage.getItem('widgetMode') === 'true'").catch(() => false);
-    savedWidgetMode.then(isWidget => {
-      if (isWidget) {
-        applyWidgetMode(true);
-      }
-    });
+    mainWindow.show();
 
-    const savedCorner = mainWindow.webContents.executeJavaScript("localStorage.getItem('widgetCorner')").catch(() => null);
-    savedCorner.then(corner => {
-      if (corner) {
-        widgetCorner = corner;
+    if (isWidget) {
+      mainWindow.webContents.executeJavaScript(`
+        document.body.classList.add('widget-mode');
+        const btn = document.getElementById('widgetToggle');
+        if (btn) btn.classList.add('active');
+      `).catch(() => {});
+    }
+  });
+
+  mainWindow.on('moved', () => {
+    if (isWidgetMode && mainWindow) {
+      const [x, y] = mainWindow.getPosition();
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+      const { x: workAreaX, y: workAreaY } = primaryDisplay.workArea;
+
+      const centerX = x + WIDGET_SIZE.width / 2;
+      const centerY = y + WIDGET_SIZE.height / 2;
+      const screenCenterX = workAreaX + screenWidth / 2;
+      const screenCenterY = workAreaY + screenHeight / 2;
+
+      let newCorner;
+      if (centerX < screenCenterX) {
+        newCorner = centerY < screenCenterY ? 'top-left' : 'bottom-left';
+      } else {
+        newCorner = centerY < screenCenterY ? 'top-right' : 'bottom-right';
       }
-    });
+
+      widgetCorner = newCorner;
+      mainWindow.webContents.executeJavaScript(`
+        localStorage.setItem('widgetCorner', '${newCorner}');
+      `).catch(() => {});
+    }
   });
 }
 
-function applyWidgetMode(enabled) {
+function recreateWindow(asWidget) {
   if (!mainWindow) return;
 
-  isWidgetMode = enabled;
+  const wasVisible = mainWindow.isVisible();
+  const oldWindow = mainWindow;
 
-  if (enabled) {
-    mainWindow.setResizable(false);
-    mainWindow.setAlwaysOnTop(true, 'screen-saver');
-    mainWindow.setSkipTaskbar(true);
-    mainWindow.setSize(WIDGET_SIZE.width, WIDGET_SIZE.height);
-    mainWindow.setMinimumSize(WIDGET_SIZE.width, WIDGET_SIZE.height);
-    mainWindow.setMaximumSize(WIDGET_SIZE.width, WIDGET_SIZE.height);
+  isWidgetMode = asWidget;
 
-    const corner = widgetCorner || 'bottom-right';
-    const pos = getCornerPosition(corner);
-    mainWindow.setPosition(pos.x, pos.y);
+  oldWindow.removeAllListeners('closed');
+  oldWindow.close();
 
-    mainWindow.webContents.executeJavaScript(`
-      document.body.classList.add('widget-mode');
-      const btn = document.getElementById('widgetToggle');
-      if (btn) btn.classList.add('active');
-    `).catch(() => {});
-  } else {
-    mainWindow.setResizable(true);
-    mainWindow.setAlwaysOnTop(true);
-    mainWindow.setSkipTaskbar(false);
-    mainWindow.setSize(900, 700);
-    mainWindow.setMinimumSize(600, 400);
-    mainWindow.setMaximumSize(0, 0);
+  createWindow(asWidget);
 
-    mainWindow.setPosition(
-      Math.floor(screen.getPrimaryDisplay().workAreaSize.width / 2 - 450),
-      Math.floor(screen.getPrimaryDisplay().workAreaSize.height / 2 - 350)
-    );
-
-    mainWindow.webContents.executeJavaScript(`
-      document.body.classList.remove('widget-mode');
-      const btn = document.getElementById('widgetToggle');
-      if (btn) btn.classList.remove('active');
-    `).catch(() => {});
+  if (wasVisible) {
+    mainWindow.webContents.once('dom-ready', () => {
+      mainWindow.show();
+    });
   }
 }
 
 ipcMain.on('set-widget-mode', (event, enabled) => {
-  applyWidgetMode(enabled);
+  recreateWindow(enabled);
 });
 
 ipcMain.on('set-widget-corner', (event, corner) => {
   setWidgetCorner(corner);
-});
-
-ipcMain.on('widget-dragged', () => {
-  if (isWidgetMode && mainWindow) {
-    const [x, y] = mainWindow.getPosition();
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
-    const { x: workAreaX, y: workAreaY } = primaryDisplay.workArea;
-
-    const centerX = x + WIDGET_SIZE.width / 2;
-    const centerY = y + WIDGET_SIZE.height / 2;
-    const screenCenterX = workAreaX + screenWidth / 2;
-    const screenCenterY = workAreaY + screenHeight / 2;
-
-    let newCorner;
-    if (centerX < screenCenterX) {
-      newCorner = centerY < screenCenterY ? 'top-left' : 'bottom-left';
-    } else {
-      newCorner = centerY < screenCenterY ? 'top-right' : 'bottom-right';
-    }
-
-    widgetCorner = newCorner;
-    mainWindow.webContents.executeJavaScript(`
-      localStorage.setItem('widgetCorner', '${newCorner}');
-    `).catch(() => {});
-  }
 });
 
 function startServer() {
@@ -302,9 +297,7 @@ function startServer() {
 app.whenReady().then(async () => {
   createTray();
   await startServer();
-  createWindow();
-
-  mainWindow.show();
+  createWindow(false);
 });
 
 app.on('window-all-closed', () => {

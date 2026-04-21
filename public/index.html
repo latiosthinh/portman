@@ -78,16 +78,75 @@
       margin-bottom: 2rem;
     }
 
-    body.widget-mode header {
-      margin-bottom: 0;
+    body.widget-mode .widget-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       padding: 1rem 1.25rem;
-      cursor: grab;
       border-bottom: 1px solid rgba(59, 74, 61, 0.1);
-      background: transparent;
+      cursor: grab;
     }
 
-    body.widget-mode header:active {
+    body.widget-mode .widget-header:active {
       cursor: grabbing;
+    }
+
+    body.widget-mode .widget-header .widget-title {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    body.widget-mode .widget-header .widget-title .pulse-dot {
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 50%;
+      background: var(--kin-primary);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    body.widget-mode .widget-header .widget-title h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.625rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--kin-on-surface);
+      opacity: 0.8;
+    }
+
+    body.widget-mode .widget-header .widget-actions {
+      display: flex;
+      gap: 0.25rem;
+    }
+
+    body.widget-mode .widget-header .widget-action-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      background: transparent;
+      border: none;
+      color: var(--kin-primary);
+      padding: 0.25rem 0.5rem;
+      font-size: 0.5625rem;
+      font-family: 'Space Grotesk', monospace;
+      border-radius: 0.25rem;
+      cursor: pointer;
+      opacity: 0.6;
+      transition: all 0.2s;
+    }
+
+    body.widget-mode .widget-header .widget-action-btn:hover {
+      background: rgba(117, 255, 158, 0.1);
+      opacity: 1;
+    }
+
+    body.widget-mode .widget-header .widget-action-btn .material-symbols-outlined {
+      font-size: 14px;
+    }
+
+    .widget-header {
+      display: none;
     }
 
     h1 {
@@ -688,6 +747,23 @@
       </div>
     </header>
 
+    <div class="widget-header" id="widgetHeaderInner">
+      <div class="widget-title">
+        <div class="pulse-dot"></div>
+        <h2>Active_Processes</h2>
+      </div>
+      <div class="widget-actions">
+        <button class="widget-action-btn" onclick="loadPorts()" title="Refresh">
+          <span class="material-symbols-outlined">refresh</span>
+          <span>Refresh</span>
+        </button>
+        <button class="widget-action-btn" onclick="toggleSystemProcesses()" id="systemToggleWidget" title="Toggle System">
+          <span class="material-symbols-outlined">visibility</span>
+          <span>System</span>
+        </button>
+      </div>
+    </div>
+
     <div class="stats">
       <div class="stat-card">
         <div class="label">Active Ports</div>
@@ -873,8 +949,14 @@
     function toggleSystemProcesses() {
       showSystem = !showSystem;
       const btn = document.getElementById('systemToggle');
-      btn.classList.toggle('active', showSystem);
-      btn.textContent = showSystem ? 'Hide System' : 'Show System';
+      if (btn) {
+        btn.classList.toggle('active', showSystem);
+        btn.textContent = showSystem ? 'Hide System' : 'Show System';
+      }
+      const widgetBtn = document.getElementById('systemToggleWidget');
+      if (widgetBtn) {
+        widgetBtn.style.opacity = showSystem ? '1' : '0.6';
+      }
       loadPorts();
     }
 
@@ -957,7 +1039,7 @@
     let dragThreshold = 5;
 
     document.addEventListener('mousedown', (e) => {
-      if (widgetMode && e.target.closest('#widgetHeader')) {
+      if (widgetMode && e.target.closest('#widgetHeaderInner')) {
         dragStart = { x: e.screenX, y: e.screenY };
       }
     });
