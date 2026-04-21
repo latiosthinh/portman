@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { app, BrowserWindow, Tray, Menu, nativeImage, dialog } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 
@@ -26,6 +26,19 @@ function createTray() {
           mainWindow.show();
           mainWindow.setAlwaysOnTop(true);
           mainWindow.focus();
+        }
+      }
+    },
+    {
+      label: 'Toggle Widget Mode',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.webContents.executeJavaScript(`
+            (function() {
+              const btn = document.getElementById('widgetToggle');
+              if (btn) btn.click();
+            })();
+          `).catch(() => {});
         }
       }
     },
@@ -63,9 +76,11 @@ function createWindow() {
     height: 700,
     show: false,
     alwaysOnTop: true,
+    frame: true,
+    transparent: false,
     webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
+      nodeIntegration: true,
+      contextIsolation: false,
     },
     title: 'Local Port Dashboard',
     icon: path.join(__dirname, 'assets', 'icon.png'),
@@ -81,7 +96,34 @@ function createWindow() {
     event.preventDefault();
     mainWindow.hide();
   });
+
+  mainWindow.webContents.on('dom-ready', () => {
+    const widgetMode = mainWindow.webContents.executeJavaScript("localStorage.getItem('widgetMode') === 'true'").catch(() => false);
+    widgetMode.then(isWidget => {
+      if (isWidget) {
+        applyWidgetMode(true);
+      }
+    });
+  });
 }
+
+function applyWidgetMode(enabled) {
+  if (!mainWindow) return;
+
+  if (enabled) {
+    mainWindow.setSize(400, 300);
+    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    mainWindow.setSkipTaskbar(true);
+  } else {
+    mainWindow.setSize(900, 700);
+    mainWindow.setAlwaysOnTop(true);
+    mainWindow.setSkipTaskbar(false);
+  }
+}
+
+ipcMain.on('set-widget-mode', (event, enabled) => {
+  applyWidgetMode(enabled);
+});
 
 function startServer() {
   return new Promise((resolve, reject) => {
