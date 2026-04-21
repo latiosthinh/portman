@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { app, BrowserWindow, Tray, Menu, nativeImage, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
