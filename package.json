@@ -1,7 +1,7 @@
 {
   "name": "portman",
   "version": "1.0.0",
-  "description": "Cross-platform port killer CLI — view and kill local ports with style",
+  "description": "Kill ports, not vibes. The fastest way to view and manage local ports.",
   "bin": {
     "portman": "bin/cli.js"
   },
@@ -15,14 +15,26 @@
     "kill",
     "cli",
     "developer-tool",
-    "cross-platform"
+    "cross-platform",
+    "devtools",
+    "networking",
+    "process-management"
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/portman/portman.git"
+    "url": "git+https://github.com/latiosthinh/portman.git"
   },
+  "bugs": {
+    "url": "https://github.com/latiosthinh/portman/issues"
+  },
+  "homepage": "https://github.com/latiosthinh/portman#readme",
   "dependencies": {},
   "engines": {
     "node": ">=14.0.0"
-  }
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "README.md"
+  ]
 }
