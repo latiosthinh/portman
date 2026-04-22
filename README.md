@@ -13,10 +13,10 @@
 ## 🚀 Quick Start
 
 ```bash
-# No install needed - run instantly
+# No install needed - summon instantly
 npx portdoom
 
-# Or install globally
+# Or install globally (if you dare)
 npm install -g portdoom
 portdoom
 ```
@@ -27,11 +27,11 @@ portdoom
 
 - ⚡ **Lightning fast** - 22ms refresh with intelligent caching
 - 🎯 **Smart grouping** - Ports organized by application
-- 🧠 **Persistent hiding** - Hide apps forever, saved locally
+- 🧠 **Persistent hiding** - Banish apps forever, saved locally
 - 🖥️ **Cross-platform** - Windows, macOS, Linux
-- 🎨 **Beautiful TUI** - Dark, doom-themed terminal interface
+- 🎨 **Dark TUI** - Doom-themed terminal interface
 - 📦 **Zero dependencies** - Pure Node.js, ~50KB total
-- 🔒 **Privacy-first** - All data stays on your machine
+- 🔒 **Privacy-first** - All data stays in your realm
 
 ---
 
@@ -39,15 +39,15 @@ portdoom
 
 | Key | Action |
 |-----|--------|
-| `↑` `↓` | Navigate ports |
-| `Space` | Kill selected process |
-| `h` | Hide this port (session) |
-| `H` | Hide entire app (permanent) |
-| `s` | Toggle system processes |
+| `↑` `↓` | Navigate the abyss |
+| `Space` | Execute selected process |
+| `h` | Banish this port (session) |
+| `H` | Banish entire app (eternal) |
+| `s` | Reveal system daemons |
 | `r` | Refresh port list |
-| `u` | Unhide everything |
-| `1` - `9` | Quick kill by ID |
-| `q` | Quit |
+| `u` | Resurrect all banished |
+| `1` - `9` | Quick execute by ID |
+| `q` | Escape to reality |
 
 ---
 
@@ -68,9 +68,9 @@ portdoom v1.0.0 (win32) 💀
        05  5500   127.0.0.1       20024  active
 
 ─────────────────────────────────────────────────────────────────
-  5 ports  2 apps  0 hidden
+  5 ports  2 apps  0 banished
 
-  ↑↓ navigate  space kill  h hide port  H hide app  s system  r refresh  u unhide all  1-9 quick kill  q quit
+  ↑↓ navigate  space kill  h banish  H eternal-banish  s system  r refresh  u resurrect  1-9 quick-execute  q quit
 ```
 
 ### Non-Interactive (Piped Output)
@@ -94,49 +94,49 @@ ID   APP                                    PORTS
 
 ### Development
 ```bash
-# Find what's using port 3000
+# Find what's haunting port 3000
 portdoom | grep 3000
 
-# Kill it fast (navigate + space, or type "3" + Enter)
+# Execute it (navigate + space, or type "3" + Enter)
 ```
 
 ### Clean Up
 ```bash
-# Hide apps you don't care about (press H)
-# They'll stay hidden forever in ~/.portdoom/config.json
+# Banish apps you don't care about (press H)
+# They'll stay in the void forever in ~/.portdoom/config.json
 ```
 
 ### Scripting
 ```bash
-# Get all ports as text
+# Summon all ports as text
 portdoom > report.txt
 
-# Check if a port is in use
-portdoom | grep -q 3000 && echo "Port 3000 is busy"
+# Check if a port is possessed
+portdoom | grep -q 3000 && echo "Port 3000 is haunted"
 ```
 
 ---
 
 ## 🔧 Configuration
 
-PortDoom stores hidden apps in:
+PortDoom stores banished apps in your crypt:
 - **Windows:** `C:\Users\You\.portdoom\config.json`
 - **macOS/Linux:** `~/.portdoom/config.json`
 
 ```json
 {
-  "hiddenApps": ["steam.exe", "OneDrive.exe"]
+  "banishedApps": ["steam.exe", "OneDrive.exe"]
 }
 ```
 
-Edit this file manually or use `H` in the app to hide, `u` to unhide all.
+Edit this ancient tome manually or use `H` in the app to banish, `u` to resurrect all.
 
 ---
 
 ## 🛠️ Development
 
 ```bash
-# Clone and install (zero dependencies!)
+# Summon the source
 git clone https://github.com/latiosthinh/portdoom.git
 cd portdoom
 
@@ -155,10 +155,10 @@ node bin/cli.js > output.txt
 
 ## 🏗️ How It Works
 
-PortDoom uses native OS commands - **no dependencies required**:
+PortDoom invokes native OS incantations - **no dependencies required**:
 
-| Platform | Port Detection | Process Kill |
-|----------|---------------|--------------|
+| Platform | Port Detection | Process Execution |
+|----------|---------------|-------------------|
 | Windows | `netstat -ano` | `taskkill /PID` |
 | macOS | `lsof -i -P -n` | `kill -9` |
 | Linux | `ss -tlnp` | `kill -9` |
@@ -171,10 +171,10 @@ Process names are cached for 5 seconds for instant refresh.
 
 | Action | Time |
 |--------|------|
-| First run | ~1.3s |
+| First summoning | ~1.3s |
 | Cached refresh | ~22ms ⚡ |
 | Package size | ~50KB |
-| Dependencies | 0 |
+| Dependencies | 0 (pure darkness) |
 
 ---
 
@@ -183,17 +183,20 @@ Process names are cached for 5 seconds for instant refresh.
 **Q: Why isn't `npx portdoom` showing the latest features?**  
 A: Make sure you're using the latest version from npm. For development, use `npm link`.
 
-**Q: Where are hidden apps stored?**  
-A: `~/.portdoom/config.json` - edit this file to manage hidden apps.
+**Q: Where are banished apps stored?**  
+A: `~/.portdoom/config.json` - edit this ancient tome to manage banished apps.
 
-**Q: Can I hide system processes?**  
-A: System processes are hidden by default. Press `s` to show them.
+**Q: Can I banish system processes?**  
+A: System daemons are hidden by default. Press `s` to reveal them (if you dare).
 
 **Q: Does this work on WSL?**  
-A: Yes! PortDoom detects the platform and uses appropriate commands.
+A: Yes! PortDoom detects the plane of existence and uses appropriate incantations.
 
 **Q: Is this safe?**  
-A: PortDoom only shows and kills processes you have permission to kill. Admin/sudo may be required for system processes.
+A: PortDoom only shows and executes processes you have permission to execute. Admin/sudo may be required for system daemons.
+
+**Q: What happens if I execute the wrong process?**  
+A: Like any dark art, use with caution. You can restart most processes, but some may be... permanently doomed. 💀
 
 ---
 
@@ -201,13 +204,13 @@ A: PortDoom only shows and kills processes you have permission to kill. Admin/su
 
 Contributions welcome! Areas we'd love help:
 
-- 🎨 Custom themes/colors
+- 🎨 Custom themes/colors (darker themes preferred)
 - 📊 Export to JSON/CSV
 - 🔍 Search/filter functionality
 - 🧪 Automated tests
 
 ```bash
-# Fork, clone, and submit a PR
+# Join the coven
 git clone https://github.com/latiosthinh/portdoom.git
 ```
 
@@ -215,12 +218,13 @@ git clone https://github.com/latiosthinh/portdoom.git
 
 ## 📝 Changelog
 
-### v1.0.0
+### v1.0.0 - The Awakening
 - ✨ Initial release
 - 🎯 Port grouping by application
-- 🧠 Persistent app hiding
+- 🧠 Eternal banishment (persistent hiding)
 - ⚡ 50x faster refresh with caching
 - 🖥️ Cross-platform support
+- 💀 Doom-themed UI
 
 ---
 
@@ -228,11 +232,13 @@ git clone https://github.com/latiosthinh/portdoom.git
 
 MIT © [PortDoom Team](https://github.com/latiosthinh/portdoom)
 
+*Use responsibly. The authors are not responsible for accidentally doomed ports.*
+
 ---
 
 <div align="center">
 
-**Made with 💀 for developers who mean business**
+**Forged in darkness 💀 for developers who mean business**
 
 [Report Issue](https://github.com/latiosthinh/portdoom/issues) • [Request Feature](https://github.com/latiosthinh/portdoom/issues) • [Discussions](https://github.com/latiosthinh/portdoom/discussions)
 
