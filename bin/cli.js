@@ -1,264 +1,232 @@
 #!/usr/bin/env node
 
-const { execSync, spawn } = require('child_process');
 const readline = require('readline');
-
-const SYSTEM_PIDS = new Set(['0', '4']);
-const SYSTEM_PROCESS_NAMES = [
-  'system', 'svchost.exe', 'services.exe', 'csrss.exe', 'smss.exe',
-  'wininit.exe', 'winlogon.exe', 'lsass.exe', 'lsm.exe', 'spoolsv.exe',
-  'taskhost.exe', 'taskhostw.exe', 'dwm.exe', 'fontdrvhost.exe',
-  'runtimebroker.exe', 'sihost.exe', 'shellinfrahost.exe'
-];
+const os = require('os');
+const { getListeningPorts, getProcessName, killProcess, isSystemProcess, platform, clearProcessCache } = require('../lib/port-detector');
+const { isAppHidden, hideApp, unhideApp, unhideAllApps, getHiddenApps } = require('../lib/config');
 
 const COLORS = {
-  reset: '\x1b[0m',
-  bold: '\x1b[1m',
-  dim: '\x1b[2m',
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  blue: '\x1b[34m',
-  cyan: '\x1b[36m',
-  red: '\x1b[31m',
-  magenta: '\x1b[35m',
-  white: '\x1b[37m',
-  bgGreen: '\x1b[42m',
-  bgBlue: '\x1b[44m',
-  bgRed: '\x1b[41m',
-  bgYellow: '\x1b[43m',
+  r: '\x1b[0m',
+  b: '\x1b[1m',
+  d: '\x1b[2m',
+  g: '\x1b[38;5;152m',
+  G: '\x1b[38;5;119m',
+  y: '\x1b[38;5;228m',
+  B: '\x1b[38;5;117m',
+  c: '\x1b[38;5;159m',
+  R: '\x1b[38;5;203m',
+  m: '\x1b[38;5;183m',
+  w: '\x1b[38;5;252m',
+  W: '\x1b[38;5;255m',
+  k: '\x1b[38;5;240m',
+  bgA: '\x1b[48;5;23;1m',
 };
 
-function isSystemProcess(processName) {
-  if (!processName) return true;
-  const lower = processName.toLowerCase();
-  return SYSTEM_PROCESS_NAMES.some(sys => lower.includes(sys));
-}
-
-function getListeningPorts() {
-  try {
-    const output = execSync('netstat -ano | findstr LISTENING', { encoding: 'utf8' });
-    const lines = output.trim().split('\n');
-    const ports = [];
-
-    for (const line of lines) {
-      const parts = line.trim().split(/\s+/);
-      if (parts.length >= 5) {
-        const localAddress = parts[1];
-        const pid = parts[4];
-        const [host, port] = localAddress.split(':');
-        if (!port) continue;
-
-        ports.push({
-          address: host,
-          port: parseInt(port),
-          pid: parseInt(pid),
-          protocol: 'TCP',
-          isSystem: SYSTEM_PIDS.has(pid),
-        });
-      }
-    }
-
-    return ports;
-  } catch (e) {
-    return [];
+function groupByProcess(ports) {
+  const groups = {};
+  for (const port of ports) {
+    const key = port.processName;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(port);
   }
+  return groups;
 }
 
-function getProcessName(pid) {
-  try {
-    const output = execSync(`tasklist /FI "PID eq ${pid}" /FO CSV /NH`, { encoding: 'utf8' });
-    const parts = output.trim().split(',');
-    if (parts.length >= 1) {
-      const name = parts[0].replace(/"/g, '');
-      return { name, isSystem: isSystemProcess(name) };
-    }
-  } catch (e) {}
-  return { name: 'Unknown', isSystem: true };
-}
+function render(ports, sel, showSys, hiddenPids, msg, cmd) {
+  const vis = ports.filter(p => {
+    if (showSys || p.isSystem) return false;
+    if (hiddenPids.has(p.pid)) return false;
+    if (isAppHidden(p.processName)) return false;
+    return true;
+  });
+  const W = process.stdout.columns || 80;
+  const groups = groupByProcess(vis);
+  const groupKeys = Object.keys(groups);
 
-function killProcess(pid) {
-  try {
-    execSync(`taskkill /PID ${pid} /F`, { encoding: 'utf8' });
-    return { success: true, message: `Process ${pid} killed` };
-  } catch (e) {
-    return { success: false, error: e.message };
-  }
-}
+  let out = '\x1b[H\x1b[2J';
 
-function formatDuration(seconds) {
-  if (seconds < 60) return `${seconds}s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
-  const hours = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  return `${hours}h ${mins}m`;
-}
+  out += `${COLORS.b}${COLORS.c}portman${COLORS.r} ${COLORS.d}v1.0.0${COLORS.r} ${COLORS.k}(${platform})${COLORS.r}\n`;
+  out += `${COLORS.d}${'─'.repeat(W)}${COLORS.r}\n`;
 
-async function getPorts() {
-  const ports = getListeningPorts();
-  const enriched = await Promise.all(
-    ports.map(async (port) => {
-      const procInfo = getProcessName(port.pid);
-      return {
-        ...port,
-        processName: procInfo.name,
-        isSystem: port.isSystem || procInfo.isSystem,
-      };
-    })
-  );
-  return enriched;
-}
-
-function renderTable(ports, selectedIndex, showSystem, hiddenPids, message) {
-  const visiblePorts = ports
-    .filter(p => showSystem || !p.isSystem)
-    .filter(p => !hiddenPids.has(p.pid))
-    .map((p, i) => ({ ...p, id: i + 1 }));
-
-  process.stdout.write('\x1b[H\x1b[2J');
-
-  console.log(`${COLORS.bold}${COLORS.cyan}╔══════════════════════════════════════════════════════════════════╗${COLORS.reset}`);
-  console.log(`${COLORS.bold}${COLORS.cyan}║${COLORS.reset}  ${COLORS.bold}${COLORS.green}⚡ LOCAL PORT DASHBOARD${COLORS.reset}                              ${COLORS.bold}${COLORS.cyan}║${COLORS.reset}`);
-  console.log(`${COLORS.bold}${COLORS.cyan}╠══════════════════════════════════════════════════════════════════╣${COLORS.reset}`);
-  console.log(`${COLORS.bold}${COLORS.cyan}║${COLORS.reset}  ${COLORS.dim}↑↓ navigate  |  space kill  |  h hide  |  s toggle system${COLORS.reset}  ${COLORS.bold}${COLORS.cyan}║${COLORS.reset}`);
-  console.log(`${COLORS.bold}${COLORS.cyan}║${COLORS.reset}  ${COLORS.dim}q quit  |  r refresh  |  u unhide all  |  <id> quick kill${COLORS.reset}  ${COLORS.bold}${COLORS.cyan}║${COLORS.reset}`);
-  console.log(`${COLORS.bold}${COLORS.cyan}╠══════════════════════════════════════════════════════════════════╣${COLORS.reset}`);
-
-  if (visiblePorts.length === 0) {
-    console.log(`${COLORS.bold}${COLORS.cyan}║${COLORS.reset}                                                              ${COLORS.bold}${COLORS.cyan}║${COLORS.reset}`);
-    console.log(`${COLORS.bold}${COLORS.cyan}║${COLORS.reset}  ${COLORS.dim}No active ports found${COLORS.reset}                                     ${COLORS.bold}${COLORS.cyan}║${COLORS.reset}`);
-    console.log(`${COLORS.bold}${COLORS.cyan}║${COLORS.reset}                                                              ${COLORS.bold}${COLORS.cyan}║${COLORS.reset}`);
+  if (vis.length === 0) {
+    out += `\n  ${COLORS.d}No user ports found${COLORS.r}\n\n`;
   } else {
-    console.log(`${COLORS.bold}${COLORS.cyan}║${COLORS.reset}  ${COLORS.bold}${COLORS.yellow}ID${COLORS.reset}   ${COLORS.bold}${COLORS.yellow}PORT${COLORS.reset}     ${COLORS.bold}${COLORS.yellow}PROCESS${COLORS.reset}              ${COLORS.bold}${COLORS.yellow}PID${COLORS.reset}     ${COLORS.bold}${COLORS.yellow}STATUS${COLORS.reset}      ${COLORS.bold}${COLORS.cyan}║${COLORS.reset}`);
-    console.log(`${COLORS.bold}${COLORS.cyan}║${COLORS.reset}  ${COLORS.dim}─────────────────────────────────────────────────────────────${COLORS.reset}  ${COLORS.bold}${COLORS.cyan}║${COLORS.reset}`);
+    out += `\n`;
+    let globalIdx = 1;
+    
+    for (const groupName of groupKeys) {
+      const group = groups[groupName];
+      
+      // Group header
+      const portCount = group.length;
+      
+      out += `  ${COLORS.b}${COLORS.y}${groupName}${COLORS.r} ${COLORS.d}(${portCount} port${portCount > 1 ? 's' : ''})${COLORS.r}\n`;
+      
+      for (let i = 0; i < group.length; i++) {
+        const p = group[i];
+        const isSel = globalIdx - 1 === sel;
+        const id = String(globalIdx).padStart(2);
+        const port = String(p.port);
+        const pid = String(p.pid);
+        const address = p.address;
 
-    for (let i = 0; i < visiblePorts.length; i++) {
-      const port = visiblePorts[i];
-      const isSelected = i === selectedIndex;
-      const idStr = String(port.id).padStart(2);
-      const portStr = String(port.port).padStart(5);
-      const pidStr = String(port.pid).padStart(7);
-
-      let processName = port.processName;
-      if (processName.length > 22) processName = processName.substring(0, 20) + '..';
-      processName = processName.padEnd(22);
-
-      let status;
-      if (port.isSystem) {
-        status = `${COLORS.dim}system${COLORS.reset}`;
-      } else {
-        status = `${COLORS.green}active${COLORS.reset}`;
+        if (isSel) {
+          out += `${COLORS.bgA} ${COLORS.r} ${COLORS.b}${COLORS.W} ▶ ${id}  ${port.padStart(5)}  ${address.padEnd(15)}  ${pid.padStart(6)}  ${COLORS.g}${p.isSystem ? 'system' : 'active'}${COLORS.r}\n`;
+        } else {
+          out += `      ${COLORS.d}${id}  ${COLORS.m}${port.padStart(5)}  ${COLORS.k}${address.padEnd(15)}  ${COLORS.d}${pid.padStart(6)}  ${p.isSystem ? COLORS.d + 'system' + COLORS.r : COLORS.g + 'active' + COLORS.r}\n`;
+        }
+        globalIdx++;
       }
-
-      const prefix = isSelected ? `${COLORS.bold}${COLORS.bgBlue}${COLORS.white} ▶ ${COLORS.reset}` : '   ';
-
-      const line = `${COLORS.bold}${COLORS.cyan}║${COLORS.reset}${prefix} ${COLORS.bold}${COLORS.cyan}${idStr}${COLORS.reset}   ${COLORS.magenta}${portStr}${COLORS.reset}   ${COLORS.white}${processName}${COLORS.reset}  ${COLORS.dim}${pidStr}${COLORS.reset}   ${status}          ${COLORS.bold}${COLORS.cyan}║${COLORS.reset}`;
-      console.log(line);
+      out += `\n`;
     }
   }
 
-  console.log(`${COLORS.bold}${COLORS.cyan}╠══════════════════════════════════════════════════════════════════╣${COLORS.reset}`);
+  out += `${COLORS.d}${'─'.repeat(W)}${COLORS.r}\n`;
+  const stats = `  ${COLORS.b}${vis.length}${COLORS.r} ports  ${COLORS.b}${groupKeys.length}${COLORS.r} apps  ${COLORS.b}${hiddenPids.size}${COLORS.r} hidden`;
+  out += stats;
 
-  const totalPorts = ports.length;
-  const visibleCount = visiblePorts.length;
-  const hiddenCount = hiddenPids.size;
-  const uniqueProcesses = new Set(ports.filter(p => !hiddenPids.has(p.pid)).map(p => p.processName)).size;
+  if (msg) {
+    out += `     ${msg}`;
+  }
+  out += '\n';
 
-  const stats = `  ${COLORS.bold}Total:${COLORS.reset} ${COLORS.cyan}${totalPorts}${COLORS.reset}  ${COLORS.bold}Visible:${COLORS.reset} ${COLORS.green}${visibleCount}${COLORS.reset}  ${COLORS.bold}Processes:${COLORS.reset} ${COLORS.yellow}${uniqueProcesses}${COLORS.reset}  ${COLORS.bold}Hidden:${COLORS.reset} ${COLORS.dim}${hiddenCount}${COLORS.reset}  `;
-  const paddedStats = stats.padEnd(62);
-  console.log(`${COLORS.bold}${COLORS.cyan}║${COLORS.reset}${paddedStats}${COLORS.bold}${COLORS.cyan}║${COLORS.reset}`);
-
-  if (message) {
-    const msgLine = `  ${message}`.padEnd(62);
-    console.log(`${COLORS.bold}${COLORS.cyan}║${COLORS.reset}${COLORS.green}${msgLine}${COLORS.bold}${COLORS.cyan}║${COLORS.reset}`);
-  } else {
-    console.log(`${COLORS.bold}${COLORS.cyan}║${COLORS.reset}                                                              ${COLORS.bold}${COLORS.cyan}║${COLORS.reset}`);
+  const hiddenApps = getHiddenApps();
+  out += `\n  ${COLORS.d}↑↓${COLORS.r} navigate  ${COLORS.d}space${COLORS.r} kill  ${COLORS.d}h${COLORS.r} hide port  ${COLORS.d}H${COLORS.r} hide app  ${COLORS.d}s${COLORS.r} system  ${COLORS.d}r${COLORS.r} refresh  ${COLORS.d}u${COLORS.r} unhide all  ${COLORS.d}1-9${COLORS.r} quick kill  ${COLORS.d}q${COLORS.r} quit`;
+  if (hiddenApps.length > 0) {
+    out += `${COLORS.d}  |  ${COLORS.y}${hiddenApps.length} hidden apps${COLORS.r}`;
   }
 
-  console.log(`${COLORS.bold}${COLORS.cyan}╚══════════════════════════════════════════════════════════════════╝${COLORS.reset}`);
+  if (cmd !== '') {
+    out += `\n\n  ${COLORS.b}›${COLORS.r} ${COLORS.W}${cmd}${COLORS.r}${COLORS.b}█${COLORS.r}`;
+  } else {
+    out += `\n`;
+  }
+
+  out += '\n';
+
+  process.stdout.write(out);
 }
 
 async function main() {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    terminal: true,
-  });
+  if (!process.stdin.isTTY) {
+    const rawPorts = getListeningPorts(false);
+    const ports = rawPorts.map(p => {
+      const proc = getProcessName(p.pid);
+      return { ...p, processName: proc.name, isSystem: p.isSystem || proc.isSystem };
+    }).filter(p => !p.isSystem);
+    
+    if (ports.length === 0) {
+      console.log('No user ports found');
+    } else {
+      const groups = {};
+      for (const p of ports) {
+        if (!groups[p.processName]) groups[p.processName] = [];
+        groups[p.processName].push(p);
+      }
+      
+      console.log('ID   APP                                    PORTS');
+      console.log('─'.repeat(60));
+      let id = 1;
+      for (const [name, group] of Object.entries(groups)) {
+        const portList = group.map(p => String(p.port)).join(', ');
+        console.log(`${String(id).padStart(2)}   ${name.padEnd(36)}   ${portList}`);
+        id++;
+      }
+    }
+    process.exit(0);
+  }
 
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
   readline.emitKeypressEvents(process.stdin);
   process.stdin.setRawMode(true);
 
   let ports = [];
-  let selectedIndex = 0;
-  let showSystem = false;
+  let sel = 0;
+  let showSys = false;
   let hiddenPids = new Set();
-  let message = '';
-  let inputBuffer = '';
-  let lastRefresh = Date.now();
+  let msg = '';
+  let cmd = '';
 
   async function refresh() {
-    ports = await getPorts();
-    if (selectedIndex >= ports.filter(p => showSystem || !p.isSystem).filter(p => !hiddenPids.has(p.pid)).length) {
-      selectedIndex = Math.max(0, ports.filter(p => showSystem || !p.isSystem).filter(p => !hiddenPids.has(p.pid)).length - 1);
-    }
-    renderTable(ports, selectedIndex, showSystem, hiddenPids, message);
-    message = '';
+    const rawPorts = getListeningPorts(false);
+    ports = rawPorts.map(p => {
+      const proc = getProcessName(p.pid);
+      return { ...p, processName: proc.name, isSystem: p.isSystem || proc.isSystem };
+    });
+    const vis = ports.filter(p => {
+      if (showSys || p.isSystem) return false;
+      if (hiddenPids.has(p.pid)) return false;
+      if (isAppHidden(p.processName)) return false;
+      return true;
+    });
+    const maxSel = vis.length - 1;
+    if (sel > maxSel) sel = Math.max(0, maxSel);
+    render(ports, sel, showSys, hiddenPids, msg, cmd);
+    msg = '';
   }
 
   await refresh();
 
   process.stdin.on('keypress', async (str, key) => {
-    if (key.ctrl && key.name === 'c') {
-      process.exit(0);
-    }
-
-    if (key.name === 'q') {
-      process.exit(0);
-    }
+    if (key.ctrl && key.name === 'c') process.exit(0);
+    if (key.name === 'q') process.exit(0);
 
     if (key.name === 'r') {
+      clearProcessCache();
       await refresh();
-      message = `${COLORS.green}✓ Refreshed${COLORS.reset}`;
-      renderTable(ports, selectedIndex, showSystem, hiddenPids, message);
+      msg = `${COLORS.G}✓ refreshed${COLORS.r}`;
+      render(ports, sel, showSys, hiddenPids, msg, cmd);
       return;
     }
 
     if (key.name === 's') {
-      showSystem = !showSystem;
-      selectedIndex = 0;
-      message = showSystem ? `${COLORS.yellow}Showing system processes${COLORS.reset}` : `${COLORS.dim}Hiding system processes${COLORS.reset}`;
+      showSys = !showSys;
+      sel = 0;
+      msg = showSys ? `${COLORS.y}showing system${COLORS.r}` : `${COLORS.d}hiding system${COLORS.r}`;
       await refresh();
       return;
     }
 
     if (key.name === 'u') {
       hiddenPids.clear();
-      message = `${COLORS.green}✓ All processes unhidden${COLORS.reset}`;
+      unhideAllApps();
+      msg = `${COLORS.G}✓ unhidden all${COLORS.r}`;
       await refresh();
       return;
     }
 
     if (key.name === 'up') {
-      selectedIndex = Math.max(0, selectedIndex - 1);
-      renderTable(ports, selectedIndex, showSystem, hiddenPids, message);
+      sel = Math.max(0, sel - 1);
+      render(ports, sel, showSys, hiddenPids, msg, cmd);
       return;
     }
 
     if (key.name === 'down') {
-      const visiblePorts = ports.filter(p => showSystem || !p.isSystem).filter(p => !hiddenPids.has(p.pid));
-      selectedIndex = Math.min(visiblePorts.length - 1, selectedIndex + 1);
-      renderTable(ports, selectedIndex, showSystem, hiddenPids, message);
+      const vis = ports.filter(p => {
+        if (showSys || p.isSystem) return false;
+        if (hiddenPids.has(p.pid)) return false;
+        if (isAppHidden(p.processName)) return false;
+        return true;
+      });
+      sel = Math.min(vis.length - 1, sel + 1);
+      render(ports, sel, showSys, hiddenPids, msg, cmd);
       return;
     }
 
-    if (key.name === 'space' || (key.name === 'return' && !inputBuffer)) {
-      const visiblePorts = ports.filter(p => showSystem || !p.isSystem).filter(p => !hiddenPids.has(p.pid));
-      if (visiblePorts[selectedIndex]) {
-        const target = visiblePorts[selectedIndex];
-        const result = killProcess(target.pid);
-        if (result.success) {
-          message = `${COLORS.green}✓ Killed ${target.processName} (PID ${target.pid})${COLORS.reset}`;
+    if (key.name === 'space' || (key.name === 'return' && cmd === '')) {
+      const vis = ports.filter(p => {
+        if (showSys || p.isSystem) return false;
+        if (hiddenPids.has(p.pid)) return false;
+        if (isAppHidden(p.processName)) return false;
+        return true;
+      });
+      if (vis[sel]) {
+        const t = vis[sel];
+        const res = killProcess(t.pid);
+        if (res.success) {
+          msg = `${COLORS.G}✓ killed ${t.processName}${COLORS.r}`;
         } else {
-          message = `${COLORS.red}✗ Failed: ${result.error}${COLORS.reset}`;
+          msg = `${COLORS.R}✗ ${res.error}${COLORS.r}`;
         }
         await refresh();
       }
@@ -266,51 +234,71 @@ async function main() {
     }
 
     if (key.name === 'h') {
-      const visiblePorts = ports.filter(p => showSystem || !p.isSystem).filter(p => !hiddenPids.has(p.pid));
-      if (visiblePorts[selectedIndex]) {
-        const target = visiblePorts[selectedIndex];
-        hiddenPids.add(target.pid);
-        message = `${COLORS.dim}Hidden ${target.processName} (PID ${target.pid})${COLORS.reset}`;
-        selectedIndex = Math.min(selectedIndex, visiblePorts.length - 2);
+      const vis = ports.filter(p => {
+        if (showSys || p.isSystem) return false;
+        if (hiddenPids.has(p.pid)) return false;
+        if (isAppHidden(p.processName)) return false;
+        return true;
+      });
+      if (vis[sel]) {
+        hiddenPids.add(vis[sel].pid);
+        msg = `${COLORS.d}hidden port ${vis[sel].port}${COLORS.r}`;
+        await refresh();
+      }
+      return;
+    }
+
+    if (key.name === 'h' && key.shift) {
+      const vis = ports.filter(p => {
+        if (showSys || p.isSystem) return false;
+        if (hiddenPids.has(p.pid)) return false;
+        if (isAppHidden(p.processName)) return false;
+        return true;
+      });
+      if (vis[sel]) {
+        const appName = vis[sel].processName;
+        hideApp(appName);
+        msg = `${COLORS.y}hidden app ${appName}${COLORS.r}`;
         await refresh();
       }
       return;
     }
 
     if (key.name === 'backspace') {
-      inputBuffer = inputBuffer.slice(0, -1);
-      renderTable(ports, selectedIndex, showSystem, hiddenPids, `${COLORS.bold}Command:${COLORS.reset} kill ${COLORS.cyan}${inputBuffer}${COLORS.reset}  ${COLORS.dim}(enter to confirm, esc to cancel)${COLORS.reset}`);
+      cmd = cmd.slice(0, -1);
+      render(ports, sel, showSys, hiddenPids, msg, cmd);
       return;
     }
 
     if (key.name === 'escape') {
-      inputBuffer = '';
-      renderTable(ports, selectedIndex, showSystem, hiddenPids, message);
+      cmd = '';
+      render(ports, sel, showSys, hiddenPids, msg, cmd);
       return;
     }
 
-    if (key.name === 'return' && inputBuffer) {
-      const id = parseInt(inputBuffer);
-      const visiblePorts = ports.filter(p => showSystem || !p.isSystem).filter(p => !hiddenPids.has(p.pid));
-      const target = visiblePorts.find(p => p.id === id);
-      if (target) {
-        const result = killProcess(target.pid);
-        if (result.success) {
-          message = `${COLORS.green}✓ Killed ${target.processName} (PID ${target.pid})${COLORS.reset}`;
-        } else {
-          message = `${COLORS.red}✗ Failed: ${result.error}${COLORS.reset}`;
-        }
+    if (key.name === 'return' && cmd) {
+      const id = parseInt(cmd);
+      const vis = ports.filter(p => {
+        if (showSys || p.isSystem) return false;
+        if (hiddenPids.has(p.pid)) return false;
+        if (isAppHidden(p.processName)) return false;
+        return true;
+      });
+      if (vis[id - 1]) {
+        const t = vis[id - 1];
+        const res = killProcess(t.pid);
+        msg = res.success ? `${COLORS.G}✓ killed ${t.processName}${COLORS.r}` : `${COLORS.R}✗ ${res.error}${COLORS.r}`;
       } else {
-        message = `${COLORS.red}✗ Invalid ID: ${inputBuffer}${COLORS.reset}`;
+        msg = `${COLORS.R}✗ invalid id${COLORS.r}`;
       }
-      inputBuffer = '';
+      cmd = '';
       await refresh();
       return;
     }
 
     if (/^\d$/.test(str) && key.name !== 'return') {
-      inputBuffer += str;
-      renderTable(ports, selectedIndex, showSystem, hiddenPids, `${COLORS.bold}Command:${COLORS.reset} kill ${COLORS.cyan}${inputBuffer}${COLORS.reset}  ${COLORS.dim}(enter to confirm, esc to cancel)${COLORS.reset}`);
+      cmd += str;
+      render(ports, sel, showSys, hiddenPids, msg, cmd);
       return;
     }
   });
@@ -318,4 +306,7 @@ async function main() {
   rl.on('close', () => process.exit(0));
 }
 
-main().catch(console.error);
+main().catch(err => {
+  console.error('PortMan error:', err.message);
+  process.exit(1);
+});

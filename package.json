@@ -1,60 +1,28 @@
 {
-  "name": "local-port-dashboard",
+  "name": "portman",
   "version": "1.0.0",
-  "description": "A small desktop dashboard to view and kill local ports",
-  "main": "main.js",
+  "description": "Cross-platform port killer CLI — view and kill local ports with style",
   "bin": {
-    "local-port-dashboard": "./bin/cli.js"
+    "portman": "bin/cli.js"
   },
   "scripts": {
-    "start": "electron .",
-    "dev": "electron .",
-    "build": "electron-builder"
+    "test": "node --test"
   },
-  "dependencies": {
-    "dotenv": "^17.4.2",
-    "electron": "^28.0.0",
-    "express": "^4.18.2"
+  "author": "PortMan Team",
+  "license": "MIT",
+  "keywords": [
+    "port",
+    "kill",
+    "cli",
+    "developer-tool",
+    "cross-platform"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/portman/portman.git"
   },
-  "devDependencies": {
-    "electron-builder": "^24.0.0"
-  },
-  "build": {
-    "appId": "com.localportdashboard.app",
-    "productName": "Local Port Dashboard",
-    "directories": {
-      "output": "dist"
-    },
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "assets/icon.png"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
-    }
-  },
-  "files": [
-    "main.js",
-    "server.js",
-    "public/**/*",
-    "bin/**/*",
-    "assets/**/*",
-    "node_modules/**/*"
-  ]
+  "dependencies": {},
+  "engines": {
+    "node": ">=14.0.0"
+  }
 }

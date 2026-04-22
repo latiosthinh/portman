@@ -27,6 +27,8 @@
 
 **Requirements:** PKG-01, PKG-02
 
+**Status:** ✅ COMPLETE — All UAT tests passed
+
 **Plans:** 2 plans
 
 Plans:
@@ -43,18 +45,32 @@ Plans:
 
 ---
 
-### Phase 3: Cross-Platform Support
+### Phase 3: Cross-Platform Support → CLI-Only Simplification
 
 **Goal:** Support macOS and Linux alongside Windows
 
 **Requirements:** PLAT-01
 
+**Status:** ✅ COMPLETE — Simplified to zero-dependency CLI
+
+**Decision:** Removed Electron/web dashboard, now pure CLI tool
+
+**Plans:** 1 plan
+
+Plans:
+- [x] 03-01-PLAN.md — Cross-platform port detection and process killing
+- [x] CLI simplification — zero dependencies, npx-ready
+
 **Success Criteria:**
-1. Port detection works on macOS (lsof equivalent)
-2. Port detection works on Linux (/proc/net or ss equivalent)
-3. Process kill works on all three platforms
-4. System process filtering adapts per platform
-5. No platform-specific crashes or errors
+1. ✅ Port detection works on macOS (lsof equivalent)
+2. ✅ Port detection works on Linux (/proc/net or ss equivalent)
+3. ✅ Process kill works on all three platforms
+4. ✅ System process filtering adapts per platform
+5. ✅ No platform-specific crashes or errors
+6. ✅ CLI works on all platforms with TTY detection
+7. ✅ npx portman works without installation
+8. ✅ Zero dependencies
+9. ✅ Localhost filtering by default (dev-focused)
 
 ---
 
@@ -69,6 +85,20 @@ Plans:
 2. Auto-refresh toggle in UI (default: off)
 3. Configurable refresh interval (5s, 10s, 30s)
 4. No performance degradation during auto-refresh
+
+---
+
+### Phase 5: UI Enhancements — Hide & Widget Mode
+
+**Goal:** Per-process hide option and desktop widget mode for always-on-top monitoring
+
+**Requirements:** UI-04, UI-05
+
+**Success Criteria:**
+1. Each process row has a hide button that removes it from view
+2. Hidden processes persist across refreshes (localStorage)
+3. Widget mode toggle makes app compact, borderless, always-on-top
+4. Widget mode can be toggled from tray menu and UI header
 
 ---
 
